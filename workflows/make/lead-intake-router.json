@@ -1,0 +1,115 @@
+{
+  "name": "Lead Intake Router",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": 0,
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {"x": 0, "y": 0},
+        "restore": {},
+        "parameters": [
+          {"name": "hook", "type": "hook:gateway-webhook", "label": "Webhook", "required": true}
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {},
+      "mapper": {
+        "url": "https://your-automation-service.example.com/api/leads/enrich",
+        "method": "post",
+        "headers": [
+          {"name": "X-API-Key", "value": "{{connection.webhookApiKey}}"},
+          {"name": "Content-Type", "value": "application/json"}
+        ],
+        "bodyType": "raw",
+        "contentType": "application/json",
+        "data": "{\"name\": \"{{1.name}}\", \"email\": \"{{1.email}}\", \"message\": \"{{1.message}}\"}"
+      },
+      "metadata": {
+        "designer": {"x": 300, "y": 0}
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "mapper": null,
+      "metadata": {
+        "designer": {"x": 600, "y": 0}
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 4,
+              "module": "slack:CreateMessage",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "channel": "#qualified-leads",
+                "text": "New qualified lead: {{1.name}} <{{1.email}}> (score {{2.quality_score}})"
+              },
+              "metadata": {"designer": {"x": 900, "y": -150}}
+            }
+          ],
+          "filter": {
+            "name": "Qualified",
+            "conditions": [[{"a": "{{2.route}}", "o": "text:equal", "b": "qualified"}]]
+          }
+        },
+        {
+          "flow": [
+            {
+              "id": 5,
+              "module": "slack:CreateMessage",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "channel": "#needs-review",
+                "text": "Lead needs manual review: {{1.name}} <{{1.email}}>"
+              },
+              "metadata": {"designer": {"x": 900, "y": 0}}
+            }
+          ],
+          "filter": {
+            "name": "Needs review",
+            "conditions": [[{"a": "{{2.route}}", "o": "text:equal", "b": "needs_review"}]]
+          }
+        },
+        {
+          "flow": [],
+          "filter": {
+            "name": "Spam",
+            "conditions": [[{"a": "{{2.route}}", "o": "text:equal", "b": "spam"}]]
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {"orphans": []},
+    "zone": "eu1.make.com"
+  }
+}
