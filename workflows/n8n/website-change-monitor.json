@@ -1,0 +1,126 @@
+{
+  "name": "Website Change Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://example.com/pricing",
+        "options": {}
+      },
+      "id": "fetch-page",
+      "name": "Fetch Target Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.WEBHOOK_BASE_URL}}/api/changes/check",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.WEBHOOK_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "source_id",
+              "value": "pricing-page"
+            },
+            {
+              "name": "content",
+              "value": "={{$json.data}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-change",
+      "name": "Check For Change",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "changed-condition",
+              "leftValue": "={{$json.changed}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-changed",
+      "name": "Did It Change?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$env.TELEGRAM_CHAT_ID}}",
+        "text": "=Pricing page changed. Checked at {{$json.checked_at}}.",
+        "additionalFields": {}
+      },
+      "id": "notify-telegram",
+      "name": "Notify On Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1120, 220]
+    }
+  ],
+  "connections": {
+    "Every 30 Minutes": {
+      "main": [[{"node": "Fetch Target Page", "type": "main", "index": 0}]]
+    },
+    "Fetch Target Page": {
+      "main": [[{"node": "Check For Change", "type": "main", "index": 0}]]
+    },
+    "Check For Change": {
+      "main": [[{"node": "Did It Change?", "type": "main", "index": 0}]]
+    },
+    "Did It Change?": {
+      "main": [[{"node": "Notify On Telegram", "type": "main", "index": 0}], []]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
